@@ -614,7 +614,6 @@ def add_coffee_shop_markers(folium_map, coffee_shops, icon_style="coffee_emoji")
                 folium.Marker(
                     location=[lat, lon],
                     popup=folium.Popup(popup_html, max_width=250),
-                    tooltip=shop_name,
                     icon=folium.CustomIcon(
                         icon_image=selected_icon["image_url"],
                         icon_size=(selected_icon["size"], selected_icon["size"])
@@ -653,11 +652,10 @@ def add_coffee_shop_markers(folium_map, coffee_shops, icon_style="coffee_emoji")
                 </div>
                 """
 
-                # Add marker with HTML icon
+                # Add marker with HTML icon (no tooltip to avoid mobile click conflicts)
                 folium.Marker(
                     location=[lat, lon],
                     popup=folium.Popup(popup_html, max_width=250),
-                    tooltip=shop_name,
                     icon=folium.DivIcon(
                         html=icon_html,
                         icon_size=(36, 36),
