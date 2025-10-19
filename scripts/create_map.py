@@ -34,8 +34,19 @@ def create_map(state, district, icon_style="coffee_emoji"):
         location=[center_lat, center_lon],
         zoom_start=9,
         tiles='CartoDB Positron',  # Clean, light gray basemap
-        attr='CartoDB'
+        attr='',  # Remove attribution text
+        control_scale=False
     )
+
+    # Add CSS to hide attribution box completely
+    hide_attribution = '''
+    <style>
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+    </style>
+    '''
+    m.get_root().html.add_child(folium.Element(hide_attribution))
     
     district_geom = district_gdf.geometry.iloc[0]
     
