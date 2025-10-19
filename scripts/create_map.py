@@ -32,27 +32,6 @@ def create_map(state, district, icon_style="coffee_emoji"):
     # Create map
     m = folium.Map(location=[center_lat, center_lon], zoom_start=9)
     
-    # Add banner
-    title_html = '''
-                <div style="position: fixed; 
-                           top: 10px; 
-                           left: 50%; 
-                           transform: translateX(-50%);
-                           width: 90%;
-                           z-index: 9999; 
-                           font-size: 18px;
-                           background-color: rgba(255,255,255,0.9);
-                           padding: 8px 15px;
-                           border-radius: 5px;
-                           box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                           text-align: center;
-                           font-family: Arial, sans-serif;
-                           font-weight: bold;">
-                CD 6 Coffee Shops
-                </div>
-                '''
-    m.get_root().html.add_child(folium.Element(title_html))
-    
     district_geom = district_gdf.geometry.iloc[0]
     
     # Process counties with geometry cleaning
@@ -202,8 +181,12 @@ def fetch_coffee_shops(csv_url):
             name = row[0].strip() if row[0] else f"Coffee Shop {i}"
             address1 = row[1].strip() if len(row) > 1 and row[1] else ""
             address2 = row[2].strip() if len(row) > 2 and row[2] else ""
+            roaster_indicator = row[4].strip() if len(row) > 4 and row[4] else ""
             county = row[5].strip() if len(row) > 5 and row[5] else ""
-            
+
+            # Check if this is a roastery (Column E contains "!")
+            is_roastery = "!" in roaster_indicator
+
             # Check for mobile-only indicators
             is_mobile = any(keyword in name.lower() for keyword in ['mobile', 'truck', 'cart', 'trailer'])
             
@@ -216,7 +199,8 @@ def fetch_coffee_shops(csv_url):
                     'original_address': address1,
                     'county': county,
                     'location_num': 1,
-                    'row_number': i + 1
+                    'row_number': i + 1,
+                    'is_roastery': is_roastery
                 })
             elif is_mobile:
                 mobile_trucks.append(name)
@@ -228,7 +212,8 @@ def fetch_coffee_shops(csv_url):
                     'original_address': "",
                     'county': county,
                     'location_num': 1,
-                    'row_number': i + 1
+                    'row_number': i + 1,
+                    'is_roastery': is_roastery
                 })
             
             # Process second address
@@ -240,7 +225,8 @@ def fetch_coffee_shops(csv_url):
                     'original_address': address2,
                     'county': county,
                     'location_num': 2,
-                    'row_number': i + 1
+                    'row_number': i + 1,
+                    'is_roastery': is_roastery
                 })
         
         print(f"Found {len(coffee_shops)} coffee shop locations")
@@ -492,6 +478,7 @@ def add_coffee_shop_markers(folium_map, coffee_shops, icon_style="coffee_emoji")
         formatted_address = shop.get('address', '')
         county = shop.get('county', '')
         row_number = shop.get('row_number', i)
+        is_roastery = shop.get('is_roastery', False)
         
         print(f"[{i}/{len(coffee_shops)}] {shop_name}")
         print(f"   Original: {original_address}")
@@ -519,10 +506,15 @@ def add_coffee_shop_markers(folium_map, coffee_shops, icon_style="coffee_emoji")
             lat, lon = coordinates
             print(f"   ✅ Success: {lat:.4f}, {lon:.4f}")
             
-            # Create popup content
+            # Create popup content with different styling for roasteries
+            popup_icon = "🫘" if is_roastery else "☕"
+            location_type = "Roastery" if is_roastery else "Coffee Shop"
             popup_html = f"""
             <div style="font-family: Arial, sans-serif; min-width: 200px;">
-                <h4 style="margin: 0 0 10px 0; color: #8B4513;">☕ {shop_name}</h4>
+                <h4 style="margin: 0 0 10px 0; color: #8B4513;">{popup_icon} {shop_name}</h4>
+                <p style="margin: 0 0 5px 0; font-size: 11px; color: #D2691E; font-weight: bold;">
+                    {location_type}
+                </p>
                 <p style="margin: 0; font-size: 12px; color: #666;">
                     <strong>Address:</strong><br>{original_address}
                 </p>
@@ -530,7 +522,7 @@ def add_coffee_shop_markers(folium_map, coffee_shops, icon_style="coffee_emoji")
             </div>
             """
             
-            # Create icon based on selected style
+            # Create icon based on selected style and type (roastery vs coffee shop)
             if selected_icon.get("type") == "image":
                 # Use custom image icon
                 folium.Marker(
@@ -543,27 +535,38 @@ def add_coffee_shop_markers(folium_map, coffee_shops, icon_style="coffee_emoji")
                     )
                 ).add_to(folium_map)
             else:
-                # Use HTML/emoji icon
-                if icon_style == "dot":
-                    icon_html = f"""
-                    <div style="
-                        font-size: {selected_icon['size']}px; 
-                        text-align: center; 
-                        line-height: {selected_icon['size']}px;
-                        color: {selected_icon.get('color', '#000')};
-                        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-                    ">{selected_icon['html']}</div>
-                    """
+                # Determine icon and background color based on type
+                if is_roastery:
+                    # Roastery: Coffee bean emoji with darker brown/orange background
+                    marker_emoji = "🫘"
+                    bg_color = "#D2691E"  # Chocolate/orange brown
+                    icon_size = 26  # Slightly larger
                 else:
-                    icon_html = f"""
+                    # Coffee Shop: Coffee cup emoji with light brown background
+                    marker_emoji = "☕"
+                    bg_color = "#DEB887"  # Burlywood/light brown
+                    icon_size = 24
+
+                # Create icon with circular background
+                icon_html = f"""
+                <div style="
+                    background-color: {bg_color};
+                    border-radius: 50%;
+                    width: 36px;
+                    height: 36px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: 2px solid #8B4513;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                ">
                     <div style="
-                        font-size: {selected_icon['size']}px; 
-                        text-align: center; 
-                        line-height: {selected_icon['size']}px;
-                        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-                    ">{selected_icon['html']}</div>
-                    """
-                
+                        font-size: {icon_size}px;
+                        line-height: 1;
+                    ">{marker_emoji}</div>
+                </div>
+                """
+
                 # Add marker with HTML icon
                 folium.Marker(
                     location=[lat, lon],
@@ -571,8 +574,8 @@ def add_coffee_shop_markers(folium_map, coffee_shops, icon_style="coffee_emoji")
                     tooltip=shop_name,
                     icon=folium.DivIcon(
                         html=icon_html,
-                        icon_size=(30, 30),
-                        icon_anchor=(15, 15)
+                        icon_size=(36, 36),
+                        icon_anchor=(18, 18)
                     )
                 ).add_to(folium_map)
             
