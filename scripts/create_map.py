@@ -29,8 +29,13 @@ def create_map(state, district, icon_style="coffee_emoji"):
     center_lat = (bounds[1] + bounds[3]) / 2
     center_lon = (bounds[0] + bounds[2]) / 2
     
-    # Create map
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=9)
+    # Create map with clean, newspaper-like tile layer
+    m = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=9,
+        tiles='CartoDB Positron',  # Clean, light gray basemap
+        attr='CartoDB'
+    )
     
     district_geom = district_gdf.geometry.iloc[0]
     
@@ -89,18 +94,99 @@ def create_map(state, district, icon_style="coffee_emoji"):
                         )
                     ).add_to(m)
     
-    # Add district boundary on top
+    # Add district boundary on top with reduced thickness
     folium.GeoJson(
         district_gdf,
         style_function=lambda x: {
             'fillColor': 'transparent',
             'color': '#0000FF',
-            'weight': 4,
+            'weight': 2,
             'fillOpacity': 0,
-            'opacity': 1.0
+            'opacity': 0.8
         }
     ).add_to(m)
-    
+
+    # Add "Locate Me" button for user geolocation
+    locate_me_control = '''
+    <script>
+    // Add Locate Me button after map loads
+    setTimeout(function() {
+        // Find the map object (Folium creates it with a variable name like map_xxxxx)
+        var mapDiv = document.querySelector('.folium-map');
+        if (!mapDiv) return;
+
+        var mapId = mapDiv.id;
+        var mapVar = window[mapId];
+
+        if (!mapVar) return;
+
+        // Create locate button
+        var locateButton = L.control({position: 'topright'});
+
+        locateButton.onAdd = function(map) {
+            var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            div.innerHTML = '<a href="#" id="locate-me-btn" style="background-color: white; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; text-decoration: none; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.4); font-size: 18px;" title="Locate Me">📍</a>';
+
+            div.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (navigator.geolocation) {
+                    // Show loading state
+                    var btn = document.getElementById('locate-me-btn');
+                    btn.innerHTML = '⌛';
+
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            var lat = position.coords.latitude;
+                            var lon = position.coords.longitude;
+
+                            // Remove previous user marker if exists
+                            if (window.userLocationMarker) {
+                                mapVar.removeLayer(window.userLocationMarker);
+                            }
+
+                            // Add a marker at user's location
+                            window.userLocationMarker = L.circleMarker([lat, lon], {
+                                radius: 8,
+                                fillColor: '#FF0000',
+                                color: '#FFFFFF',
+                                weight: 2,
+                                opacity: 1,
+                                fillOpacity: 0.8
+                            }).addTo(mapVar);
+
+                            window.userLocationMarker.bindPopup('<b>You are here!</b>').openPopup();
+
+                            // Zoom to user location
+                            mapVar.setView([lat, lon], 13);
+
+                            // Reset button
+                            btn.innerHTML = '📍';
+                        },
+                        function(error) {
+                            alert('Unable to retrieve your location. Please enable location services.');
+                            btn.innerHTML = '📍';
+                        }
+                    );
+                } else {
+                    alert('Geolocation is not supported by your browser');
+                }
+
+                return false;
+            };
+
+            return div;
+        };
+
+        locateButton.addTo(mapVar);
+    }, 500);
+    </script>
+    '''
+
+    # Add this script after the map is created
+    m.get_root().html.add_child(folium.Element(locate_me_control))
+
     # ADD COFFEE SHOP OVERLAY
     print("\n" + "="*50)
     print("ADDING COFFEE SHOP OVERLAY")
