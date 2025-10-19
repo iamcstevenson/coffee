@@ -75,12 +75,12 @@ def create_map(state, district, icon_style="coffee_emoji"):
                         clean_geom = polygons[0] if len(polygons) == 1 else MultiPolygon(polygons)
                 
                 if clean_geom and not clean_geom.is_empty:
-                    # Add county with lighter blue shade
+                    # Add county with light brown shade
                     folium.GeoJson(
                         clean_geom,
                         style_function=lambda x: {
-                            'fillColor': '#F8FFFF',
-                            'color': '#0000FF',
+                            'fillColor': '#F5E6D3',
+                            'color': '#8B4513',
                             'weight': 1,
                             'fillOpacity': 0.7,
                             'opacity': 0.8
